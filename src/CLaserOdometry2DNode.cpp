@@ -72,6 +72,7 @@ CLaserOdometry2DNode::CLaserOdometry2DNode(): Node("CLaserOdometry2DNode")
   // Init variables
   rf2o_ref.module_initialized = false;
   rf2o_ref.first_laser_scan   = true;
+  odometry_published = false;
 }
 
 
@@ -168,15 +169,11 @@ void CLaserOdometry2DNode::process()
     rf2o_ref.odometryCalculation(last_scan);
 
     // Publish odometry over ROS2 (tf/topic)
-    publish();
-
-    // Do not run on the same data!
-    new_scan_available = false;
-  }
-  else
-  {
-    // This is a warning. We depend on laser scans, so no meaning running faster than scan freq.
-    RCLCPP_WARN(get_logger(), "Waiting for laser_scans....");
+    if (publish())
+    {
+      // Do not run on the same data!
+      new_scan_available = false;
+    }
   }
 }
 
@@ -201,10 +198,11 @@ void CLaserOdometry2DNode::initPoseCallBack(const nav_msgs::msg::Odometry::Share
  * Publish current odocmetry estimation over ROS
  * According to the node parameters it will publish over tf and/or especified topic
 */
-void CLaserOdometry2DNode::publish()
+bool CLaserOdometry2DNode::publish()
 {
+  try
+  {
   // 1. publish odom as a topic (no harm!)
-  RCLCPP_DEBUG(get_logger(), "Publishing odom over topic:[%s]", odom_topic.c_str());
   tf2::Quaternion tf_quaternion;
   tf_quaternion.setRPY(0.0, 0.0, rf2o::getYaw(rf2o_ref.robot_pose_.rotation()));
   geometry_msgs::msg::Quaternion quaternion = tf2::toMsg(tf_quaternion);
@@ -240,6 +238,19 @@ void CLaserOdometry2DNode::publish()
     odom_trans.transform.rotation = quaternion;
     //send the transform
     odom_broadcaster->sendTransform(odom_trans);
+  }
+
+    if (!odometry_published)
+    {
+        RCLCPP_DEBUG(get_logger(), "RF2O odometry is working and publishing on [%s]", odom_topic.c_str());
+      odometry_published = true;
+    }
+    return true;
+  }
+  catch (const std::exception &ex)
+  {
+    RCLCPP_ERROR(get_logger(), "Error publishing odometry: %s", ex.what());
+    return false;
   }
 }
 
