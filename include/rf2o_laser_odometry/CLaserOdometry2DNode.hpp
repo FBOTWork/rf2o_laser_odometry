@@ -16,13 +16,13 @@ class CLaserOdometry2DNode : public rclcpp::Node
 public:
   CLaserOdometry2DNode();
   void process();
-  void publish();
+  bool publish();
   bool setLaserPoseFromTf();
   bool scan_available();
 
   // Params & vars
   CLaserOdometry2D    rf2o_ref;
-  bool                publish_tf, new_scan_available;
+  bool                publish_tf, new_scan_available, odometry_published;
   double              freq;
   std::string         laser_scan_topic;
   std::string         odom_topic;
