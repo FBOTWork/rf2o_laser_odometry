@@ -16,15 +16,12 @@ def generate_launch_description():
         executable='rf2o_laser_odometry_node',
         name='rf2o_laser_odometry',
         output='screen',
+        arguments=['--ros-args', '--log-level', 'rf2o_laser_odometry:=warn'],
         parameters=[{
             'use_sim_time': LaunchConfiguration('use_sim_time'),
-            # Robo real so tem o hokuyo frontal ativo (ver hokuyo.launch.py);
-            # esse eh o topico onde ele (ou a bridge do Gazebo) publica.
+            
             'laser_scan_topic' : '/laser_scan_front',
             'odom_topic' : '/odom_rf2o',
-            # publish_tf=False: o EKF (ekf.launch.py) ja publica odom -> base_footprint,
-            # fundindo esse /odom_rf2o com o dead-reckoning de roda (imu_odom_node).
-            # Se o rf2o tambem publicasse TF, os dois brigariam pela mesma transform.
             'publish_tf' : False,
             'base_frame_id' : 'base_footprint',
             'odom_frame_id' : 'odom',
