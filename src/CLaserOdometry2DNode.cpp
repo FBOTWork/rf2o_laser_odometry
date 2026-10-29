@@ -39,6 +39,17 @@ CLaserOdometry2DNode::CLaserOdometry2DNode(): Node("CLaserOdometry2DNode")
   this->get_parameter("init_pose_from_topic", init_pose_from_topic);
   this->declare_parameter<double>("freq", 10.0);
   this->get_parameter("freq", freq);
+  // Diagonal (x, y, z, roll, pitch, yaw) of the published covariances. Zeros keep the old behavior.
+  this->declare_parameter<std::vector<double>>("pose_covariance_diagonal", std::vector<double>(6, 0.0));
+  this->get_parameter("pose_covariance_diagonal", pose_covariance_diagonal);
+  this->declare_parameter<std::vector<double>>("twist_covariance_diagonal", std::vector<double>(6, 0.0));
+  this->get_parameter("twist_covariance_diagonal", twist_covariance_diagonal);
+  if (pose_covariance_diagonal.size() != 6 || twist_covariance_diagonal.size() != 6)
+  {
+    RCLCPP_ERROR(get_logger(), "Covariance diagonals must have 6 values, using zeros");
+    pose_covariance_diagonal.assign(6, 0.0);
+    twist_covariance_diagonal.assign(6, 0.0);
+  }
 
   // Init Publishers and Subscribers
   //---------------------------------
@@ -99,7 +110,9 @@ void CLaserOdometry2DNode::LaserCallBack(const sensor_msgs::msg::LaserScan::Shar
     else
     {
       // Initialize module on first scan (from laser params)
-      setLaserPoseFromTf();
+      // Wait for the laser TF, otherwise rf2o would assume the laser is at base_frame_id
+      if (!setLaserPoseFromTf())
+        return;
       rf2o_ref.init(last_scan, initial_robot_pose.pose.pose);
       rf2o_ref.first_laser_scan = false;
     }
@@ -113,18 +126,16 @@ void CLaserOdometry2DNode::LaserCallBack(const sensor_msgs::msg::LaserScan::Shar
    */
 bool CLaserOdometry2DNode::setLaserPoseFromTf()
 {  
-  bool retrieved = false;  
   geometry_msgs::msg::TransformStamped tf_laser;
 
   try
   {
     tf_laser = buffer_->lookupTransform(base_frame_id, last_scan.header.frame_id, tf2::TimePointZero);
-    retrieved = true;
   }
   catch (tf2::TransformException &ex)
   {
-    RCLCPP_ERROR(get_logger(), "%s",ex.what());
-    retrieved = false;
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Waiting for laser TF: %s", ex.what());
+    return false;
   }
 
   // Keep this transform as Eigen Matrix3d
@@ -147,7 +158,7 @@ bool CLaserOdometry2DNode::setLaserPoseFromTf()
   // Sets this transform in rf2o 
   rf2o_ref.setLaserPose(laser_tf);
 
-  return retrieved;
+  return true;
 }
 
 
@@ -219,8 +230,14 @@ bool CLaserOdometry2DNode::publish()
   //set the velocity
   odom.child_frame_id = base_frame_id;
   odom.twist.twist.linear.x = rf2o_ref.lin_speed;    //linear speed
-  odom.twist.twist.linear.y = 0.0;
+  odom.twist.twist.linear.y = rf2o_ref.lin_speed_y;  //lateral speed
   odom.twist.twist.angular.z = rf2o_ref.ang_speed;   //angular speed
+  //set the covariances (diagonal only)
+  for (size_t i = 0; i < 6; i++)
+  {
+    odom.pose.covariance[i * 7] = pose_covariance_diagonal[i];
+    odom.twist.covariance[i * 7] = twist_covariance_diagonal[i];
+  }
   //publish the message
   odom_pub->publish(odom);
 

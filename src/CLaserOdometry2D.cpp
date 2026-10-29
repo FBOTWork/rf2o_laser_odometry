@@ -28,6 +28,9 @@ CLaserOdometry2D::CLaserOdometry2D() :
   verbose(false),
   module_initialized(false),
   first_laser_scan(true),
+  lin_speed(0.0),
+  lin_speed_y(0.0),
+  ang_speed(0.0),
   last_increment_(Pose3d::Identity()),
   laser_pose_on_robot_(Pose3d::Identity()),
   laser_pose_on_robot_inv_(Pose3d::Identity()),
@@ -985,7 +988,13 @@ void CLaserOdometry2D::PoseUpdate()
   //-------------------------------------------------------------------------------------
   double time_inc_sec = (current_scan_time - last_odom_time).seconds();
   last_odom_time = current_scan_time;
-  lin_speed = acu_trans(0,2) / time_inc_sec;
+  // Repeated or unstamped scans would give 0/0 = NaN speeds
+  const double inv_time_inc = time_inc_sec > 0.0 ? 1.0 / time_inc_sec : 0.0;
+  // Speeds from the robot pose increment, expressed in the base frame
+  // (acu_trans is in the laser frame, which is wrong for rotated/offset lasers)
+  const Pose3d robot_increment = robot_oldpose_.inverse() * robot_pose_;
+  lin_speed   = robot_increment.translation()(0) * inv_time_inc;
+  lin_speed_y = robot_increment.translation()(1) * inv_time_inc;
   //double lin_speed = sqrt( mrpt::math::square(robot_oldpose.x()-robot_pose.x()) + mrpt::math::square(robot_oldpose.y()-robot_pose.y()) )/time_inc_sec;
 
   double ang_inc = rf2o::getYaw(robot_pose_.rotation()) -
@@ -996,7 +1005,7 @@ void CLaserOdometry2D::PoseUpdate()
   if (ang_inc < -3.14159)
     ang_inc += 2*3.14159;
 
-  ang_speed = ang_inc/time_inc_sec;
+  ang_speed = ang_inc * inv_time_inc;
   robot_oldpose_ = robot_pose_;
 
   //filter speeds

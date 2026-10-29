@@ -18,6 +18,10 @@ def generate_launch_description():
         description='Also run rf2o on the rear lidar if true'
     )
 
+    # Diagonal (x, y, z, roll, pitch, yaw); z/roll/pitch are not estimated
+    pose_covariance_diagonal = [0.01, 0.01, 1e3, 1e3, 1e3, 0.01]
+    twist_covariance_diagonal = [0.0025, 0.0025, 1e3, 1e3, 1e3, 0.005]
+
     rf2o_node = Node(
         package='rf2o_laser_odometry',
         executable='rf2o_laser_odometry_node',
@@ -32,7 +36,9 @@ def generate_launch_description():
             'base_frame_id' : 'base_footprint',
             'odom_frame_id' : 'odom',
             'init_pose_from_topic' : '',
-            'freq' : 20.0}],
+            'freq' : 20.0,
+            'pose_covariance_diagonal' : pose_covariance_diagonal,
+            'twist_covariance_diagonal' : twist_covariance_diagonal}],
     )
 
     rf2o_rear_node = Node(
@@ -49,7 +55,9 @@ def generate_launch_description():
             'base_frame_id' : 'base_footprint',
             'odom_frame_id' : 'odom',
             'init_pose_from_topic' : '',
-            'freq' : 20.0}],
+            'freq' : 20.0,
+            'pose_covariance_diagonal' : pose_covariance_diagonal,
+            'twist_covariance_diagonal' : twist_covariance_diagonal}],
         condition=IfCondition(LaunchConfiguration('use_two_lidars')),
     )
 

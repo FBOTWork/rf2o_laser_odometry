@@ -29,6 +29,8 @@ public:
   std::string         base_frame_id;
   std::string         odom_frame_id;
   std::string         init_pose_from_topic;
+  std::vector<double> pose_covariance_diagonal;
+  std::vector<double> twist_covariance_diagonal;
 
   sensor_msgs::msg::LaserScan                     last_scan;
   bool                                            GT_pose_initialized;
